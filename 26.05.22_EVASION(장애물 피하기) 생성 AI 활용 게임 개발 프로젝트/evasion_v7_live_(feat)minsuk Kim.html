@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EVASION</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap');
+    *{margin:0;padding:0;box-sizing:border-box}
+    body,html{background:#0a0a0f}
+    #root{font-family:'Share Tech Mono',monospace;background:#0a0a0f;color:#ffffff;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:700px;padding:.75rem;position:relative;overflow:hidden}
+    #root::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 48px,rgba(0,255,180,.02) 48px,rgba(0,255,180,.02) 49px),repeating-linear-gradient(90deg,transparent,transparent 48px,rgba(0,255,180,.02) 48px,rgba(0,255,180,.02) 49px);pointer-events:none;z-index:0}
+    canvas{display:block;position:relative;z-index:1;border:1px solid #1a1a3a}
+
+    /* HUD */
+    #hud{display:flex;justify-content:space-between;align-items:center;width:620px;padding:5px 0;position:relative;z-index:2;font-size:12px;color:#00ffb4}
+    #life-bar{display:flex;gap:5px}
+    .life-icon svg{width:14px;height:14px;display:block}
+    .hud-label{font-size:9px;color:#8888bb;letter-spacing:1px}   /* 밝게 */
+    .hud-val{font-size:13px;color:#00ffb4;letter-spacing:1px}
+
+    /* screens */
+    .screen{position:absolute;inset:0;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,.93);gap:12px}
+    .screen.hidden{display:none}
+    .title-txt{font-family:'Orbitron',monospace;font-size:32px;font-weight:900;color:#00ffb4;letter-spacing:5px;text-shadow:0 0 24px rgba(0,255,180,.35)}
+    .sub-txt{font-size:12px;color:#ccccee;letter-spacing:2px}   /* 흰색계열 */
+    .btn{font-family:'Orbitron',monospace;font-size:11px;letter-spacing:2px;padding:10px 26px;background:transparent;border:1px solid #00ffb4;color:#00ffb4;cursor:pointer;transition:all .18s;text-transform:uppercase}
+    .btn:hover{background:rgba(0,255,180,.1);box-shadow:0 0 10px rgba(0,255,180,.2)}
+    .btn:active{transform:scale(.97)}
+    .stat-row{font-size:13px;color:#ccccee;letter-spacing:1px}   /* 흰색계열 */
+    .stat-row span{color:#00ffb4;font-weight:700}
+
+    /* difficulty picker */
+    #diff-row{display:flex;gap:10px;align-items:stretch}
+    .diff-btn{font-family:'Orbitron',monospace;font-size:10px;letter-spacing:1px;padding:10px 18px;background:transparent;cursor:pointer;transition:all .18s;text-transform:uppercase;display:flex;flex-direction:column;align-items:center;gap:5px;border:1px solid #333360;color:#9090c0}
+    .diff-btn span.dlabel{font-size:11px;font-weight:700}
+    .diff-btn span.ddesc{font-size:9px;letter-spacing:.5px;color:#bbbbdd}   /* 밝게 */
+    .diff-btn:hover{background:rgba(255,255,255,.05)}
+    .diff-btn.easy{border-color:#00cc80;color:#00cc80}
+    .diff-btn.hard{border-color:#ff9000;color:#ff9000}
+    .diff-btn.ext{border-color:#ff2060;color:#ff2060}
+    .diff-btn.selected{background:rgba(0,255,180,.08)!important}
+    .diff-btn.easy.selected{background:rgba(0,200,120,.12)!important}
+    .diff-btn.hard.selected{background:rgba(255,140,0,.1)!important}
+    .diff-btn.ext.selected{background:rgba(255,30,80,.1)!important}
+
+    /* leaderboard */
+    .leaderboard{width:340px;border:1px solid #2a2a4a}
+    .lb-title{font-family:'Orbitron',monospace;font-size:9px;letter-spacing:3px;color:#aaaacc;padding:6px 12px;border-bottom:1px solid #2a2a4a;text-align:center}   /* 밝게 */
+    .lb-row{display:flex;align-items:center;gap:10px;padding:4px 12px;border-bottom:1px solid #111128;font-size:11px}
+    .lb-row:last-child{border-bottom:none}
+    .lb-rank{width:20px;color:#7777aa;font-family:'Orbitron',monospace;font-size:10px}
+    .lb-rank.gold{color:#ffd700}.lb-rank.silver{color:#c0c0c0}.lb-rank.bronze{color:#cd7f32}
+    .lb-score{flex:1;color:#00ffb4;font-size:12px;font-weight:700}
+    .lb-time{color:#aaaacc;font-size:10px}   /* 밝게 */
+    .lb-diff{font-size:9px;margin-left:4px;opacity:.9}
+    .lb-new{color:#ff4080;font-size:9px;letter-spacing:1px;margin-left:4px;animation:blink .8s infinite}
+    @keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+    .controls-hint{font-size:11px;color:#ccccee;letter-spacing:1px;text-align:center;line-height:2.0}   /* 밝게 */
+
+    /* event banner */
+    #event-banner{position:absolute;top:0;left:0;right:0;z-index:5;display:flex;flex-direction:column;align-items:center;pointer-events:none;padding-top:3px}
+    #event-title{font-family:'Orbitron',monospace;font-size:13px;font-weight:900;letter-spacing:3px;color:#ff4000;opacity:0;transition:opacity .2s;text-shadow:0 0 8px rgba(255,80,0,.7)}
+    #event-sub{font-size:10px;letter-spacing:2px;color:#ff8040;opacity:0;transition:opacity .2s}
+  </style>
+</head>
+<body>
+  <div id="root">
+    <div id="screen-start" class="screen">
+      <div class="title-txt">EVASION</div>
+      <div class="sub-txt">// 생존 프로토콜 v7 //</div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
+        <div style="font-size:10px;letter-spacing:2px;color:#aaaacc">DIFFICULTY</div>
+        <div id="diff-row">
+          <button class="diff-btn easy" data-diff="easy"><span class="dlabel">쉬움</span><span class="ddesc">EASY · LIFE ×5</span></button>
+          <button class="diff-btn hard selected" data-diff="hard"><span class="dlabel">어려움</span><span class="ddesc">HARD · LIFE ×5</span></button>
+          <button class="diff-btn ext" data-diff="ext"><span class="dlabel">익스트림</span><span class="ddesc">EXTREME · LIFE ×3</span></button>
+        </div>
+      </div>
+      <div id="lb-start"></div>
+      <button class="btn" id="btn-start">START GAME</button>
+      <div class="controls-hint">방향키 ↑↓←→ 이동 · 장애물 충돌 시 라이프 감소<br>10초마다 특수 이벤트 · 70초 이후 감마 레이저 발사<br>EXTREME: 50초부터 난이도 급상승</div>
+    </div>
+
+    <div id="screen-over" class="screen hidden">
+      <div class="title-txt" style="font-size:20px;color:#ff4080;letter-spacing:3px">SYSTEM FAILURE</div>
+      <div id="over-stats" style="display:flex;flex-direction:column;gap:5px;align-items:center"></div>
+      <div id="lb-over"></div>
+      <button class="btn" id="btn-retry">RETRY</button>
+      <button class="btn" id="btn-menu" style="border-color:#6666aa;color:#aaaacc;font-size:10px;padding:7px 20px">MENU</button>
+    </div>
+
+    <div id="event-banner">
+      <div id="event-title"></div>
+      <div id="event-sub"></div>
+    </div>
+
+    <div id="hud">
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <div class="hud-label">SCORE</div>
+        <div class="hud-val" id="h-score">0</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:2px;align-items:center">
+        <div class="hud-label">DIFFICULTY</div>
+        <div class="hud-val" id="h-diff" style="font-size:11px">HARD</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:2px;align-items:center">
+        <div class="hud-label">LIFE</div>
+        <div id="life-bar"></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:2px;align-items:center">
+        <div class="hud-label">TIME · LEVEL</div>
+        <div class="hud-val"><span id="h-time">0.0s</span> · LV<span id="h-level">1</span></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:2px;align-items:flex-end">
+        <div class="hud-label">BEST</div>
+        <div class="hud-val" id="h-best" style="color:#8888bb">0</div>
+      </div>
+    </div>
+    <canvas id="c"></canvas>
+  </div>
+
+  <script>
+  const canvas=document.getElementById('c'),ctx=canvas.getContext('2d');
+  const W=620,H=560;
+  canvas.width=W;canvas.height=H;
+
+  // ── 상수 ─────────────────────────────────────────────────────
+  const EVENTS=['barrage','meteor','scatter8'];
+  const EVENT_INTERVAL=10, WARN_DUR=2.5;
+  const LASER_START=70, LASER_INTERVAL=20, LASER_WARN=2.0, LASER_FIRE=2.0;
+  const EXT_SURGE_AT=50, EXT_SURGE_WARN=2.0;
+  const DIFF_COLOR={easy:'#00cc80',hard:'#ff9000',ext:'#ff2060'};
+  const DIFF_TAG={easy:'EASY',hard:'HARD',ext:'EXT'};
+
+  // ── 난이도 설정 — EXTREME LIFE 3개로 수정 ─────────────────
+  const DIFF_CFG={
+    easy:{label:'EASY', maxLife:5, spawnMul:.65, speedMul:.70, aimMul:.55, levelInterval:16, extraLv:[5,9],  extraCh:[.20,.15], scoreMul:.7},
+    hard:{label:'HARD', maxLife:5, spawnMul:1.0, speedMul:1.0, aimMul:1.0, levelInterval:12, extraLv:[4,7],  extraCh:[.28,.22], scoreMul:1.0},
+    ext: {label:'EXTREME',maxLife:3, spawnMul:1.45,speedMul:1.40,aimMul:1.35,levelInterval:8, extraLv:[3,5], extraCh:[.40,.32], scoreMul:1.5}
+  };
+
+  let chosenDiff='hard';
+  let state='start',score=0,elapsed=0,lastTs=null,animId=null;
+  let player,obstacles,particles,shakeTimer=0,invincibleTimer=0;
+  const INV_DUR=1.8;
+  let leaderboard=[],newEntryIndex=-1,spawnTimer=1.0;
+
+  // Event FSM
+  let eventPhase='idle',warnTimer=0,pendingEvent='',nextEventAt=EVENT_INTERVAL;
+  // ZZZSSSLaser FSM
+  let laserPhase='idle',laserWarnTimer=0,laserFireTimer=0,laserData=null,nextLaserAt=LASER_START;
+  // Extreme surge FSM
+  let surgeDone=false,surgePhase='idle',surgeWarnTimer=0,surgeActive=false;
+
+  // ── Leaderboard ───────────────────────────────────────────────
+  function loadLB(){try{const d=localStorage.getItem('evasion_lb_v7');if(d)leaderboard=JSON.parse(d);}catch(e){}leaderboard=leaderboard.filter(x=>x&&typeof x.score==='number');leaderboard.sort((a,b)=>b.score-a.score);leaderboard=leaderboard.slice(0,10);}
+  function saveLB(){try{localStorage.setItem('evasion_lb_v7',JSON.stringify(leaderboard));}catch(e){}}
+  function insertScore(sc,tm,diff){const e={score:Math.round(sc),time:tm.toFixed(1),diff};leaderboard.push(e);leaderboard.sort((a,b)=>b.score-a.score);leaderboard=leaderboard.slice(0,10);newEntryIndex=leaderboard.indexOf(e);saveLB();return newEntryIndex;}
+
+  function heartSVG(f){
+    const c=f?'#ff4080':'#2a1a2a',s=f?'#ff4080':'#3a2a3a';
+    return `<svg viewBox="0 0 14 13" fill="${c}" stroke="${s}" stroke-width="1"><path d="M7 12C7 12 1 8 1 4.5 1 2.5 2.5 1 4.5 1 5.7 1 6.7 1.7 7 2.5 7.3 1.7 8.3 1 9.5 1 11.5 1 13 2.5 13 4.5 13 8 7 12 7 12Z"/></svg>`;
+  }
+  function updateLifeBar(l){
+    const max=DIFF_CFG[chosenDiff].maxLife;
+    let h='';for(let i=0;i<max;i++)h+=`<span class="life-icon">${heartSVG(i<l)}</span>`;
+    document.getElementById('life-bar').innerHTML=h;
+  }
+  function renderLB(id){
+    const el=document.getElementById(id);if(!el)return;
+    if(!leaderboard.length){
+      el.innerHTML='<div style="color:#aaaacc;font-size:11px;padding:10px;text-align:center;letter-spacing:1px">기록 없음</div>';
+      return;
+    }
+    const rows=leaderboard.map((e,i)=>{
+      const rc=i===0?'gold':i===1?'silver':i===2?'bronze':'';
+      const isNew=i===newEntryIndex&&id==='lb-over';
+      const dc=DIFF_COLOR[e.diff]||'#aaa';
+      const dt=DIFF_TAG[e.diff]||'';
+      return `<div class="lb-row"><span class="lb-rank ${rc}">${i+1}</span><span class="lb-score">${e.score.toLocaleString()}${isNew?'<span class="lb-new"> NEW</span>':''}<span class="lb-diff" style="color:${dc}">[${dt}]</span></span><span class="lb-time">${e.time}s</span></div>`;
+    }).join('');
+    el.innerHTML=`<div class="leaderboard"><div class="lb-title">LEADERBOARD</div>${rows}</div>`;
+  }
+
+  // ── Banner ────────────────────────────────────────────────────
+  function showBanner(t,s){
+    document.getElementById('event-title').textContent=t;
+    document.getElementById('event-sub').textContent=s;
+    document.getElementById('event-title').style.opacity='1';
+    document.getElementById('event-sub').style.opacity='1';
+  }
+  function hideBanner(){
+    document.getElementById('event-title').style.opacity='0';
+    document.getElementById('event-sub').style.opacity='0';
+  }
+
+  // ── Shape 드로잉 ──────────────────────────────────────────────
+  // 0=원, 1=사각, 2=삼각, 3=초승달, 4=별, 5=우주선
+  function drawShape(shape,r){
+    switch(shape){
+      case 0:
+        ctx.beginPath();ctx.arc(0,0,r,0,Math.PI*2);ctx.fill();ctx.stroke();break;
+      case 1:{
+        const s=r*1.2;ctx.beginPath();ctx.rect(-s/2,-s/2,s,s);ctx.fill();ctx.stroke();break;
+      }
+      case 2:
+        ctx.beginPath();
+        for(let i=0;i<3;i++)ctx.lineTo(Math.cos(Math.PI*2/3*i-Math.PI/2)*r,Math.sin(Math.PI*2/3*i-Math.PI/2)*r);
+        ctx.closePath();ctx.fill();ctx.stroke();break;
+      case 3:
+        ctx.save();
+        ctx.beginPath();ctx.arc(0,0,r,0,Math.PI*2);ctx.fill();ctx.stroke();
+        ctx.globalCompositeOperation='destination-out';
+        ctx.beginPath();ctx.arc(r*.45,0,r*.78,0,Math.PI*2);ctx.fill();
+        ctx.globalCompositeOperation='source-over';
+        ctx.restore();break;
+      case 4:
+        ctx.beginPath();
+        for(let i=0;i<10;i++){
+          const a=Math.PI/5*i-Math.PI/2;
+          const rad=i%2===0?r:r*.42;
+          i===0?ctx.moveTo(Math.cos(a)*rad,Math.sin(a)*rad):ctx.lineTo(Math.cos(a)*rad,Math.sin(a)*rad);
+        }
+        ctx.closePath();ctx.fill();ctx.stroke();break;
+      case 5:
+        ctx.beginPath();
+        ctx.moveTo(0,-r);ctx.lineTo(r*.6,r*.5);ctx.lineTo(r*.25,r*.2);
+        ctx.lineTo(0,r*.55);ctx.lineTo(-r*.25,r*.2);ctx.lineTo(-r*.6,r*.5);
+        ctx.closePath();ctx.fill();ctx.stroke();break;
+    }
+  }
+
+  function drawObstacle(o){
+    ctx.save();ctx.translate(o.x,o.y);ctx.rotate(o.rot);
+    if(o.isMeteor){ctx.shadowColor=`hsl(${o.hue},100%,60%)`;ctx.shadowBlur=18;}
+    ctx.strokeStyle=`hsl(${o.hue},100%,${o.isMeteor?70:65}%)`;
+    ctx.lineWidth=o.isMeteor?3:2;
+    ctx.fillStyle=`hsla(${o.hue},100%,${o.isMeteor?30:40}%,${o.isMeteor?.55:.35})`;
+    drawShape(o.shape,o.r);
+    if(o.isMeteor)ctx.shadowBlur=0;
+    ctx.restore();
+  }
+
+  function drawPlayer(){
+    const blink=invincibleTimer>0&&Math.floor(invincibleTimer*10)%2===0;if(blink)return;
+    ctx.save();
+    player.trail.forEach((p,i)=>{
+      ctx.beginPath();ctx.arc(p.x,p.y,player.r*(i/player.trail.length)*.6,0,Math.PI*2);
+      ctx.fillStyle=`rgba(0,255,180,${(i/player.trail.length)*.25})`;ctx.fill();
+    });
+    ctx.beginPath();ctx.arc(player.x,player.y,player.r,0,Math.PI*2);
+    ctx.fillStyle=invincibleTimer>0?'rgba(0,255,180,.5)':'#00ffb4';ctx.fill();
+    ctx.beginPath();ctx.arc(player.x,player.y,player.r+3,0,Math.PI*2);
+    ctx.strokeStyle='rgba(0,255,180,.28)';ctx.lineWidth=2;ctx.stroke();
+    ctx.beginPath();ctx.arc(player.x,player.y,3,0,Math.PI*2);ctx.fillStyle='#0a0a0f';ctx.fill();
+    ctx.restore();
+  }
+
+  function drawLaser(){
+    if(!laserData)return;
+    const ld=laserData;
+    if(laserPhase==='warning'){
+      const pulse=.5+.5*Math.sin(Date.now()*.02);
+      ctx.save();ctx.globalAlpha=.55*pulse;ctx.strokeStyle='#00ffff';ctx.lineWidth=2;ctx.setLineDash([8,6]);
+      ctx.beginPath();
+      if(ld.axis==='h'){ctx.moveTo(0,ld.pos);ctx.lineTo(W,ld.pos);}
+      else{ctx.moveTo(ld.pos,0);ctx.lineTo(ld.pos,H);}
+      ctx.stroke();ctx.setLineDash([]);ctx.restore();
+    } else if(laserPhase==='firing'){
+      const t=laserFireTimer/LASER_FIRE,core=Math.min(1,(2-t)*3);
+      ctx.save();
+      ctx.globalAlpha=core*.35;ctx.fillStyle='rgba(0,255,255,1)';
+      if(ld.axis==='h'){ctx.fillRect(0,ld.pos-26,W,52);}else{ctx.fillRect(ld.pos-26,0,52,H);}
+      ctx.globalAlpha=core*.9;ctx.fillStyle='#ffffff';
+      if(ld.axis==='h'){ctx.fillRect(0,ld.pos-4,W,8);}else{ctx.fillRect(ld.pos-4,0,8,H);}
+      ctx.restore();
+    }
+  }
+
+  // ── 이벤트 로직 ───────────────────────────────────────────────
+  const ETITLES={barrage:'⚠ BARRAGE INCOMING ⚠',meteor:'⚠ METEOR ALERT ⚠',scatter8:'⚠ SCATTER INCOMING ⚠'};
+  const ESUBS={barrage:'파편 폭격 — 이동하라',meteor:'대형 운석 — 피하라',scatter8:'8방향 파편 — 중심을 피하라'};
+
+  function startEventWarn(){
+    const t=EVENTS[Math.floor(Math.random()*EVENTS.length)];
+    pendingEvent=t;eventPhase='warning';warnTimer=WARN_DUR;showBanner(ETITLES[t],ESUBS[t]);
+  }
+  function fireEvent(type){
+    eventPhase='idle';hideBanner();nextEventAt=elapsed+EVENT_INTERVAL;
+    if(type==='barrage')fireBarrage();
+    else if(type==='meteor')fireMeteor();
+    else fireScatter8();
+  }
+
+  function getSurgeMul(){return surgeActive?1.5:1.0;}
+
+  function fireBarrage(){
+    const cfg=DIFF_CFG[chosenDiff],sm=getSurgeMul();
+    const side=Math.floor(Math.random()*4);
+    const count=Math.round((20+Math.floor(Math.random()*8))*cfg.spawnMul*sm);
+    const speed=(3.6+getLevel(elapsed)*.18)*cfg.speedMul*sm;
+    const shapes=[0,1,2,4,5];
+    for(let i=0;i<count;i++){
+      setTimeout(()=>{
+        if(state!=='play')return;
+        const sp=12;let x,y,vx,vy;
+        if(side===0){x=W/2+(i-count/2)*sp;y=-12;vx=(Math.random()-.5)*.5;vy=speed+Math.random()*.8;}
+        else if(side===1){x=W+12;y=H/2+(i-count/2)*sp;vx=-(speed+Math.random()*.8);vy=(Math.random()-.5)*.5;}
+        else if(side===2){x=W/2+(i-count/2)*sp;y=H+12;vx=(Math.random()-.5)*.5;vy=-(speed+Math.random()*.8);}
+        else{x=-12;y=H/2+(i-count/2)*sp;vx=speed+Math.random()*.8;vy=(Math.random()-.5)*.5;}
+        obstacles.push({x,y,vx,vy,r:6+Math.random()*5,hue:40+Math.random()*20,rot:Math.random()*Math.PI*2,rotV:.12,shape:shapes[Math.floor(Math.random()*shapes.length)]});
+      },i*80);
+    }
+  }
+
+  function fireMeteor(){
+    const cfg=DIFF_CFG[chosenDiff],sm=getSurgeMul();
+    const side=Math.floor(Math.random()*4);
+    const speed=(1.7+getLevel(elapsed)*.1)*cfg.speedMul*sm;
+    let x,y,vx,vy;
+    if(side===0){x=80+Math.random()*(W-160);y=-65;vx=(player.x-x)*.007*cfg.aimMul;vy=speed;}
+    else if(side===1){x=W+65;y=80+Math.random()*(H-160);vx=-speed;vy=(player.y-y)*.007*cfg.aimMul;}
+    else if(side===2){x=80+Math.random()*(W-160);y=H+65;vx=(player.x-x)*.007*cfg.aimMul;vy=-speed;}
+    else{x=-65;y=80+Math.random()*(H-160);vx=speed;vy=(player.y-y)*.007*cfg.aimMul;}
+    obstacles.push({x,y,vx,vy,r:54,hue:25,rot:0,rotV:.02,shape:0,isMeteor:true});
+  }
+
+  // ── [핵심 수정] scatter8: 8방향 파편이 화면 4방향에서 동시에 날아옴 ──
+  function fireScatter8(){
+    const cfg=DIFF_CFG[chosenDiff],sm=getSurgeMul();
+    const speed=(3.2+getLevel(elapsed)*.15)*cfg.speedMul*sm;
+    const shapes=[3,4,5,0,2];
+    // 8방향 = 상하좌우 + 대각선 4개
+    const dirs=[
+      // [spawn x, spawn y, vx, vy]
+      [W/2,      -20,       0,          speed],       // 위
+      [W/2,      H+20,      0,         -speed],       // 아래
+      [-20,       H/2,      speed,      0    ],       // 왼
+      [W+20,      H/2,     -speed,      0    ],       // 오른
+      [-20,       -20,      speed*.7,   speed*.7],    // 좌상
+      [W+20,      -20,     -speed*.7,   speed*.7],    // 우상
+      [-20,       H+20,     speed*.7,  -speed*.7],    // 좌하
+      [W+20,      H+20,    -speed*.7,  -speed*.7],    // 우하
+    ];
+    // 각 방향마다 3~4개씩 약간 퍼져서 스폰
+    dirs.forEach(([bx,by,dvx,dvy],di)=>{
+      const count=3+Math.floor(Math.random()*2);
+      for(let j=0;j<count;j++){
+        setTimeout(()=>{
+          if(state!=='play')return;
+          // 방향에 따라 수직 방향으로 spread
+          const perp=di<4?(di<2?1:0):(0.5);
+          const perpDir=di<2?(j-1)*22:((di<4)?(j-1)*22:(j-1)*18);
+          const sx=bx+(di<2?perpDir:0);
+          const sy=by+(di>=2&&di<4?perpDir:0);
+          const jitter=(Math.random()-.5)*.6;
+          obstacles.push({
+            x:sx,y:sy,
+            vx:dvx+jitter*(di<2?1:0),
+            vy:dvy+jitter*(di>=2&&di<4?1:0),
+            r:8+Math.random()*6,
+            hue:200+Math.random()*60,
+            rot:Math.random()*Math.PI*2,
+            rotV:(Math.random()-.5)*.2,
+            shape:shapes[Math.floor(Math.random()*shapes.length)]
+          });
+        },j*60+di*30);
+      }
+    });
+  }
+
+  // ── 레이저 ────────────────────────────────────────────────────
+  function startLaserWarn(){
+    laserPhase='warning';laserWarnTimer=LASER_WARN;
+    const axis=Math.random()<.5?'h':'v';
+    const pos=axis==='h'?80+Math.random()*(H-160):80+Math.random()*(W-160);
+    laserData={axis,pos};
+    showBanner(axis==='h'?'⚠ GAMMA RAY — HORIZONTAL ⚠':'⚠ GAMMA RAY — VERTICAL ⚠','레이저 발사 준비 — 이동하라');
+  }
+  function fireLaser(){laserPhase='firing';laserFireTimer=LASER_FIRE;hideBanner();}
+  function checkLaserHit(){
+    if(!laserData||invincibleTimer>0)return;
+    const pw=14;
+    if(laserData.axis==='h'){if(Math.abs(player.y-laserData.pos)<pw)onHit({hue:180});}
+    else{if(Math.abs(player.x-laserData.pos)<pw)onHit({hue:180});}
+  }
+
+  // ── 헬퍼 ──────────────────────────────────────────────────────
+  function spawnParticles(x,y,n,hue){
+    for(let i=0;i<n;i++){const a=Math.random()*Math.PI*2,sp=1+Math.random()*5;particles.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:1,hue,size:2+Math.random()*4});}
+  }
+  function collides(p,o){const dx=p.x-o.x,dy=p.y-o.y;return Math.sqrt(dx*dx+dy*dy)<p.r+o.r*.72;}
+  function getLevel(t){return Math.floor(t/DIFF_CFG[chosenDiff].levelInterval)+1;}
+  function getSpeed(t){const cfg=DIFF_CFG[chosenDiff],sm=getSurgeMul();return(1.8+getLevel(t)*.32+Math.sin(t*.6)*.25+(Math.random()-.5)*.2)*cfg.speedMul*sm;}
+  function getSpawnRate(t){const cfg=DIFF_CFG[chosenDiff],sm=getSurgeMul();return Math.max(.28,(1.6-getLevel(t)*.09-Math.random()*.06)/(cfg.spawnMul*sm));}
+
+  function spawnObstacle(t){
+    const cfg=DIFF_CFG[chosenDiff];
+    const speed=getSpeed(t),side=Math.floor(Math.random()*4),size=7+Math.random()*11;
+    let x,y,vx,vy;const aim=(.6+Math.random()*.6)*cfg.aimMul;
+    if(side===0){x=Math.random()*W;y=-size;vx=(player.x-x)*.012*aim;vy=speed+Math.random();}
+    else if(side===1){x=W+size;y=Math.random()*H;vx=-(speed+Math.random());vy=(player.y-y)*.012*aim;}
+    else if(side===2){x=Math.random()*W;y=H+size;vx=(player.x-x)*.012*aim;vy=-(speed+Math.random());}
+    else{x=-size;y=Math.random()*H;vx=speed+Math.random();vy=(player.y-y)*.012*aim;}
+    const allShapes=[0,1,2,3,4,5];
+    obstacles.push({x,y,vx,vy,r:size,hue:Math.random()>.65?350:190+Math.random()*50,rot:Math.random()*Math.PI*2,rotV:(Math.random()-.5)*.1,shape:allShapes[Math.floor(Math.random()*allShapes.length)]});
+  }
+
+  function onHit(o){
+    player.life--;updateLifeBar(player.life);
+    spawnParticles(player.x,player.y,18,o.hue||0);
+    invincibleTimer=INV_DUR;shakeTimer=.3;
+    if(player.life<=0){spawnParticles(player.x,player.y,50,0);setTimeout(()=>gameOver(),200);state='dying';}
+  }
+
+  // ── 키 입력 ───────────────────────────────────────────────────
+  const keys={};
+  document.addEventListener('keydown',e=>{keys[e.key]=true;if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key))e.preventDefault();});
+  document.addEventListener('keyup',e=>{keys[e.key]=false;});
+
+  // ── 초기화 ────────────────────────────────────────────────────
+  function initGame(){
+    const cfg=DIFF_CFG[chosenDiff];
+    player={x:W/2,y:H/2,r:9,vx:0,vy:0,trail:[],life:cfg.maxLife};
+    obstacles=[];particles=[];score=0;elapsed=0;lastTs=null;
+    shakeTimer=0;invincibleTimer=0;spawnTimer=1.0;
+    eventPhase='idle';warnTimer=0;pendingEvent='';nextEventAt=EVENT_INTERVAL;
+    laserPhase='idle';laserWarnTimer=0;laserFireTimer=0;laserData=null;nextLaserAt=LASER_START;
+    surgeDone=false;surgePhase='idle';surgeWarnTimer=0;surgeActive=false;
+    hideBanner();
+    updateLifeBar(cfg.maxLife);
+    document.getElementById('h-diff').textContent=cfg.label;
+    document.getElementById('h-diff').style.color=DIFF_COLOR[chosenDiff];
+    document.getElementById('h-score').textContent='0';
+    document.getElementById('h-time').textContent='0.0s';
+    document.getElementById('h-level').textContent='1';
+  }
+
+  // ── Update ────────────────────────────────────────────────────
+  function update(dt){
+    if(invincibleTimer>0)invincibleTimer-=dt;
+    if(shakeTimer>0)shakeTimer-=dt;
+
+    // EXTREME 50s surge
+    if(chosenDiff==='ext'&&!surgeDone&&surgePhase==='idle'&&elapsed>=EXT_SURGE_AT){
+      surgePhase='warning';surgeWarnTimer=EXT_SURGE_WARN;
+      spawnTimer=EXT_SURGE_WARN+.5;
+      showBanner('⚠ EXTREME SURGE ⚠','50초 돌파 — 난이도 급상승!');
+    }
+    if(surgePhase==='warning'){
+      surgeWarnTimer-=dt;
+      if(surgeWarnTimer<=0){surgePhase='active';surgeActive=true;surgeDone=true;hideBanner();}
+    }
+
+    // Event FSM
+    if(surgePhase!=='warning'){
+      if(eventPhase==='idle'&&elapsed>=nextEventAt)startEventWarn();
+      else if(eventPhase==='warning'){warnTimer-=dt;if(warnTimer<=0)fireEvent(pendingEvent);}
+    }
+
+    // Laser FSM
+    if(laserPhase==='idle'&&elapsed>=nextLaserAt)startLaserWarn();
+    else if(laserPhase==='warning'){laserWarnTimer-=dt;if(laserWarnTimer<=0)fireLaser();}
+    else if(laserPhase==='firing'){
+      laserFireTimer-=dt;checkLaserHit();
+      if(laserFireTimer<=0){laserPhase='idle';laserData=null;nextLaserAt=elapsed+LASER_INTERVAL;hideBanner();}
+    }
+
+    // Player movement
+    const spd=3.5;let mx=0,my=0;
+    if(keys['ArrowLeft'])mx=-1;if(keys['ArrowRight'])mx=1;
+    if(keys['ArrowUp'])my=-1;if(keys['ArrowDown'])my=1;
+    if(mx||my){const m=Math.sqrt(mx*mx+my*my);player.vx=mx/m*spd;player.vy=my/m*spd;}
+    else{player.vx*=.82;player.vy*=.82;}
+    player.trail.push({x:player.x,y:player.y});if(player.trail.length>10)player.trail.shift();
+    player.x=Math.max(player.r,Math.min(W-player.r,player.x+player.vx*dt*60));
+    player.y=Math.max(player.r,Math.min(H-player.r,player.y+player.vy*dt*60));
+
+    // Normal spawn
+    if(surgePhase!=='warning'){
+      spawnTimer-=dt;
+      if(spawnTimer<=0){
+        const cfg=DIFF_CFG[chosenDiff];
+        spawnObstacle(elapsed);
+        const l=getLevel(elapsed);
+        if(l>=cfg.extraLv[0]&&Math.random()<cfg.extraCh[0])spawnObstacle(elapsed);
+        if(l>=cfg.extraLv[1]&&Math.random()<cfg.extraCh[1])spawnObstacle(elapsed);
+        spawnTimer=getSpawnRate(elapsed);
+      }
+    }
+
+    // Obstacles update
+    obstacles=obstacles.filter(o=>{
+      o.x+=o.vx*dt*60;o.y+=o.vy*dt*60;o.rot+=o.rotV;
+      if(o.x<-90||o.x>W+90||o.y<-90||o.y>H+90)return false;
+      if(invincibleTimer<=0&&collides(player,o)){onHit(o);return false;}
+      return true;
+    });
+
+    particles=particles.filter(p=>{p.x+=p.vx*dt*60;p.y+=p.vy*dt*60;p.life-=dt*2.2;return p.life>0;});
+
+    elapsed+=dt;
+    const cfg=DIFF_CFG[chosenDiff];
+    score=elapsed*10*(1+getLevel(elapsed)*.1)*cfg.scoreMul*(surgeActive?1.3:1);
+    document.getElementById('h-score').textContent=Math.round(score).toLocaleString();
+    document.getElementById('h-time').textContent=elapsed.toFixed(1)+'s';
+    document.getElementById('h-level').textContent=getLevel(elapsed);
+    const best=leaderboard.length?leaderboard[0].score:0;
+    document.getElementById('h-best').textContent=Math.round(best).toLocaleString();
+  }
+
+  // ── Draw ──────────────────────────────────────────────────────
+  function draw(){
+    ctx.save();
+    if(shakeTimer>0){const s=Math.sin(shakeTimer*80)*4*shakeTimer;ctx.translate(s,s*.4);}
+    ctx.clearRect(-10,-10,W+20,H+20);ctx.fillStyle='#0a0a0f';ctx.fillRect(-10,-10,W+20,H+20);
+    const l=getLevel(elapsed);
+    if(l>=5){ctx.fillStyle=`rgba(255,0,60,${Math.min(.04,(l-4)*.008)})`;ctx.fillRect(-10,-10,W+20,H+20);}
+    if(surgePhase==='warning'){
+      const pulse=.5+.5*Math.sin(Date.now()*.018);
+      ctx.fillStyle=`rgba(255,0,40,${.18*pulse})`;ctx.fillRect(0,0,W,H);
+      ctx.strokeStyle=`rgba(255,30,30,${.8*pulse})`;ctx.lineWidth=8;ctx.strokeRect(4,4,W-8,H-8);
+    }
+    if(eventPhase==='warning'){const p=.5+.5*Math.sin(Date.now()*.015);ctx.strokeStyle=`rgba(255,64,0,${.55*p})`;ctx.lineWidth=6;ctx.strokeRect(3,3,W-6,H-6);}
+    if(invincibleTimer>0){ctx.strokeStyle=`rgba(0,255,180,${.2*invincibleTimer/INV_DUR})`;ctx.lineWidth=4;ctx.strokeRect(2,2,W-4,H-4);}
+    obstacles.forEach(drawObstacle);
+    particles.forEach(p=>{ctx.beginPath();ctx.arc(p.x,p.y,p.size*p.life,0,Math.PI*2);ctx.fillStyle=`hsla(${p.hue},100%,65%,${p.life})`;ctx.fill();});
+    drawLaser();
+    if(state==='play'||state==='dying')drawPlayer();
+    ctx.restore();
+  }
+
+  // ── Game over / loop ──────────────────────────────────────────
+  function gameOver(){
+    state='over';cancelAnimationFrame(animId);hideBanner();
+    const fs=Math.round(score),ft=elapsed;
+    const idx=insertScore(fs,ft,chosenDiff);
+    const cfg=DIFF_CFG[chosenDiff];
+    document.getElementById('over-stats').innerHTML=`
+      <div class="stat-row" style="color:${DIFF_COLOR[chosenDiff]};font-size:11px;letter-spacing:2px">${cfg.label}</div>
+      <div class="stat-row">최종 스코어: <span>${fs.toLocaleString()}</span></div>
+      <div class="stat-row">생존 시간: <span>${ft.toFixed(2)}s</span></div>
+      <div class="stat-row">최고 레벨: <span>${getLevel(ft)}</span></div>
+      ${chosenDiff==='ext'&&surgeActive?'<div class="stat-row" style="color:#ff2060;font-size:11px">⚡ SURGE 돌파 달성</div>':''}
+      ${idx!==-1&&idx<10?`<div class="stat-row" style="color:#ff4080;font-size:12px">🏆 ${idx+1}위 달성!</div>`:''}
+    `;
+    renderLB('lb-over');
+    document.getElementById('screen-over').classList.remove('hidden');
+  }
+
+  function loop(ts){
+    if(state!=='play'&&state!=='dying')return;
+    if(!lastTs)lastTs=ts;
+    const dt=Math.min((ts-lastTs)/1000,.05);lastTs=ts;
+    if(state==='play')update(dt);
+    else{particles=particles.filter(p=>{p.x+=p.vx*dt*60;p.y+=p.vy*dt*60;p.life-=dt*2;return p.life>0;});}
+    draw();animId=requestAnimationFrame(loop);
+  }
+
+  function startGame(){
+    document.getElementById('screen-start').classList.add('hidden');
+    document.getElementById('screen-over').classList.add('hidden');
+    initGame();state='play';newEntryIndex=-1;lastTs=null;
+    animId=requestAnimationFrame(loop);
+  }
+  function goMenu(){
+    state='menu';cancelAnimationFrame(animId);hideBanner();
+    document.getElementById('screen-over').classList.add('hidden');
+    document.getElementById('screen-start').classList.remove('hidden');
+    renderLB('lb-start');
+  }
+
+  document.querySelectorAll('.diff-btn').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      document.querySelectorAll('.diff-btn').forEach(b=>b.classList.remove('selected'));
+      btn.classList.add('selected');chosenDiff=btn.dataset.diff;
+    });
+  });
+  document.getElementById('btn-start').addEventListener('click',startGame);
+  document.getElementById('btn-retry').addEventListener('click',startGame);
+  document.getElementById('btn-menu').addEventListener('click',goMenu);
+
+  loadLB();renderLB('lb-start');
+  ctx.fillStyle='#0a0a0f';ctx.fillRect(0,0,W,H);
+  </script>
+</body>
+</html>
